@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="A modern, high-productivity To-Do & Task Manager built for Android & Mobile Web.">
+  <title>TaskFlow • Modern To-Do</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    /* Android App Feel Styles & Custom Scrollbar */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    
+    body {
+      overscroll-behavior-y: contain;
+      user-select: none;
+    }
+
+    /* Smooth transitions */
+    .task-item {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .completed-title {
+      text-decoration: line-through;
+      opacity: 0.6;
+    }
+
+    /* Modal Animation */
+    .modal-enter {
+      animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Safe Area Spacing for Mobile Keyboards and Nav Bars */
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 1.25rem);
+    }
+    .pt-safe {
+      padding-top: env(safe-area-inset-top, 1rem);
+    }
+
+    /* Hide scrollbars for pill lists */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="h-full bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors duration-200">
+
+  <!-- TOP APP BAR -->
+  <header class="pt-safe sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
+    <div class="max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+          <i class="fa-solid fa-check-double text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-slate-900 dark:text-white leading-tight">TaskFlow</h1>
+          <p id="today-date" class="text-xs text-slate-500 dark:text-slate-400 font-medium"></p>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="flex items-center space-x-1.5">
+        <button id="pwa-install-btn" title="Add to Home Screen" class="hidden text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/60 p-2.5 rounded-xl hover:bg-brand-100 transition active:scale-95 text-xs font-semibold flex items-center gap-1.5">
+          <i class="fa-solid fa-download"></i>
+          <span>Install</span>
+        </button>
+        <button id="theme-toggle-btn" aria-label="Toggle Theme" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition active:scale-90">
+          <i id="theme-icon" class="fa-solid fa-moon"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- SEARCH BAR -->
+    <div class="max-w-md mx-auto px-4 pb-2.5">
+      <div class="relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+        <input 
+          id="search-input" 
+          type="text" 
+          placeholder="Search your tasks..." 
+          class="w-full bg-slate-100 dark:bg-slate-800/80 text-sm rounded-xl pl-10 pr-9 py-2.5 outline-none focus:ring-2 focus:ring-brand-500 border border-transparent transition placeholder:text-slate-400 text-slate-900 dark:text-white"
+        >
+        <button id="clear-search-btn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+          <i class="fa-solid fa-circle-xmark"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- CATEGORY PILLS -->
+    <div class="max-w-md mx-auto px-4 pb-3 flex items-center space-x-2 overflow-x-auto no-scrollbar">
+      <button data-cat="all" class="category-btn active px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-brand-600 text-white shadow-sm transition">
+        All
+      </button>
+      <button data-cat="Work" class="category-btn px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+        💼 Work
+      </button>
+      <button data-cat="Personal" class="category-btn px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+        🌱 Personal
+      </button>
+      <button data-cat="Urgent" class="category-btn px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+        🔥 Urgent
+      </button>
+      <button data-cat="Shopping" class="category-btn px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+        🛒 Shopping
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="flex-1 overflow-y-auto px-4 py-3 max-w-md mx-auto w-full pb-28">
+    
+    <!-- STATS SUMMARY CARD -->
+    <div class="bg-gradient-to-r from-brand-600 to-indigo-600 text-white rounded-2xl p-4 shadow-lg shadow-brand-500/15 mb-4 flex items-center justify-between">
+      <div>
+        <span class="text-xs uppercase font-bold tracking-wider text-indigo-100">Progress</span>
+        <h2 id="stats-text" class="text-xl font-bold mt-0.5">0 of 0 done</h2>
+        <div class="w-36 bg-white/20 rounded-full h-2 mt-2 overflow-hidden">
+          <div id="stats-bar" class="bg-white h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+      <div id="stats-percentage" class="text-3xl font-black text-white/90">0%</div>
+    </div>
+
+    <!-- STATUS TABS (All / Active / Completed) -->
+    <div class="flex items-center justify-between mb-3 px-1">
+      <div class="flex items-center bg-slate-200/80 dark:bg-slate-800/80 p-0.5 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300">
+        <button data-status="all" class="status-tab px-3 py-1.5 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm transition">All</button>
+        <button data-status="active" class="status-tab px-3 py-1.5 rounded-lg hover:text-slate-900 dark:hover:text-white transition">Active</button>
+        <button data-status="completed" class="status-tab px-3 py-1.5 rounded-lg hover:text-slate-900 dark:hover:text-white transition">Done</button>
+      </div>
+
+      <button id="clear-completed-btn" class="text-xs text-rose-500 hover:text-rose-600 dark:text-rose-400 font-medium py-1 px-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition">
+        Clear Done
+      </button>
+    </div>
+
+    <!-- TASK LIST -->
+    <div id="task-list" class="space-y-2.5">
+      <!-- Tasks dynamically injected here -->
+    </div>
+
+    <!-- EMPTY STATE -->
+    <div id="empty-state" class="hidden text-center py-14 px-4">
+      <div class="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3 text-slate-400">
+        <i class="fa-regular fa-clipboard text-2xl"></i>
+      </div>
+      <p class="text-base font-semibold text-slate-700 dark:text-slate-200">No tasks found</p>
+      <p class="text-xs text-slate-400 mt-1">Tap the plus button below to create your first task!</p>
+    </div>
+  </main>
+
+  <!-- FLOATING ACTION BUTTON (FAB) FOR NEW TASK -->
+  <div class="fixed bottom-6 right-6 z-20 max-w-md mx-auto">
+    <button 
+      id="open-modal-fab" 
+      aria-label="Create New Task"
+      class="w-14 h-14 rounded-full bg-brand-600 hover:bg-brand-700 text-white shadow-xl shadow-brand-600/40 flex items-center justify-center text-xl transition-transform active:scale-90"
+    >
+      <i class="fa-solid fa-plus"></i>
+    </button>
+  </div>
+
+  <!-- TASK MODAL (ADD / EDIT) -->
+  <div id="task-modal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex flex-col justify-end transition-opacity">
+    <div class="bg-white dark:bg-slate-900 rounded-t-3xl p-5 pb-safe max-w-md w-full mx-auto shadow-2xl modal-enter border-t border-slate-200 dark:border-slate-800">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+        <h3 id="modal-title" class="text-base font-bold text-slate-900 dark:text-white">Add New Task</h3>
+        <button id="close-modal-btn" class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Modal Form -->
+      <form id="task-form" class="mt-4 space-y-4">
+        <input type="hidden" id="task-id">
+
+        <!-- Title -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">Task Description *</label>
+          <input 
+            type="text" 
+            id="task-title-input" 
+            placeholder="e.g., Pay electricity bill, review draft" 
+            required
+            class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-900 dark:text-white"
+          >
+        </div>
+
+        <!-- Category & Priority Row -->
+        <div class="grid grid-cols-2 gap-3">
+          <!-- Category -->
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">Category</label>
+            <select id="task-category-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-900 dark:text-white">
+              <option value="Personal">🌱 Personal</option>
+              <option value="Work">💼 Work</option>
+              <option value="Urgent">🔥 Urgent</option>
+              <option value="Shopping">🛒 Shopping</option>
+            </select>
+          </div>
+
+          <!-- Priority -->
+          <div>
+            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">Priority</label>
+            <select id="task-priority-select" class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-900 dark:text-white">
+              <option value="Low">🟢 Low</option>
+              <option value="Medium" selected>🟡 Medium</option>
+              <option value="High">🔴 High</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Due Date & Time -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1.5">Due Date & Time (Optional)</label>
+          <input 
+            type="datetime-local" 
+            id="task-due-input" 
+            class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-900 dark:text-white"
+          >
+        </div>
+
+        <!-- Buttons -->
+        <div class="pt-2 flex items-center space-x-2">
+          <button 
+            type="button" 
+            id="cancel-modal-btn" 
+            class="flex-1 py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-300 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 active:scale-98 transition"
+          >
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            id="save-task-btn" 
+            class="flex-1 py-3 px-4 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm shadow-md shadow-brand-500/20 active:scale-98 transition"
+          >
+            Save Task
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 dark:bg-white/90 text-white dark:text-slate-900 text-xs font-semibold py-2.5 px-4 rounded-full shadow-lg backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300 flex items-center gap-2">
+    <i id="toast-icon" class="fa-solid fa-check text-brand-400 dark:text-brand-600"></i>
+    <span id="toast-msg">Task updated</span>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    /* =========================================================
+       1. STATE & STORAGE MANAGEMENT
+       ========================================================= */
+    const STORAGE_KEY = 'taskflow_tasks_v1';
+    const THEME_KEY = 'taskflow_theme';
+
+    let tasks = [];
+    let currentFilterCategory = 'all';
+    let currentFilterStatus = 'all';
+    let searchQuery = '';
+    let deferredPrompt = null;
+
+    // Load initial tasks or seed if empty
+    function loadTasks() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          tasks = JSON.parse(stored);
+        } catch (e) {
+          console.error("Failed to parse stored tasks:", e);
+          tasks = [];
+        }
+      } else {
+        // Sample starter tasks for a delightful first-time experience
+        tasks = [
+          {
+            id: 'task_1',
+            title: 'Welcome to TaskFlow! Tap the circle to complete',
+            category: 'Personal',
+            priority: 'Medium',
+            dueDate: '',
+            completed: false,
+            createdAt: Date.now() - 3600000
+          },
+          {
+            id: 'task_2',
+            title: 'Add to Android Home screen via Chrome Menu (⋮) or button',
+            category: 'Urgent',
+            priority: 'High',
+            dueDate: '',
+            completed: false,
+            createdAt: Date.now() - 1800000
+          },
+          {
+            id: 'task_3',
+            title: 'Prepare project presentation',
+            category: 'Work',
+            priority: 'High',
+            dueDate: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
+            completed: true,
+            createdAt: Date.now() - 7200000
+          }
+        ];
+        saveTasks();
+      }
+    }
+
+    function saveTasks() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+      render();
+    }
+
+    /* =========================================================
+       2. UI & DOM SELECTORS
+       ========================================================= */
+    const taskListEl = document.getElementById('task-list');
+    const emptyStateEl = document.getElementById('empty-state');
+    const statsTextEl = document.getElementById('stats-text');
+    const statsBarEl = document.getElementById('stats-bar');
+    const statsPercentageEl = document.getElementById('stats-percentage');
+    const todayDateEl = document.getElementById('today-date');
+
+    const searchInput = document.getElementById('search-input');
+    const clearSearchBtn = document.getElementById('clear-search-btn');
+
+    const taskModal = document.getElementById('task-modal');
+    const taskForm = document.getElementById('task-form');
+    const taskIdInput = document.getElementById('task-id');
+    const taskTitleInput = document.getElementById('task-title-input');
+    const taskCategorySelect = document.getElementById('task-category-select');
+    const taskPrioritySelect = document.getElementById('task-priority-select');
+    const taskDueInput = document.getElementById('task-due-input');
+    const modalTitle = document.getElementById('modal-title');
+
+    const openModalFab = document.getElementById('open-modal-fab');
+    const closeModalBtn = document.getElementById('close-modal-btn');
+    const cancelModalBtn = document.getElementById('cancel-modal-btn');
+    const clearCompletedBtn = document.getElementById('clear-completed-btn');
+
+    const themeToggleBtn = document.getElementById('theme-toggle-btn');
+    const themeIcon = document.getElementById('theme-icon');
+    const pwaInstallBtn = document.getElementById('pwa-install-btn');
+
+    /* =========================================================
+       3. THEME MANAGEMENT (DARK / LIGHT)
+       ========================================================= */
+    function initTheme() {
+      const savedTheme = localStorage.getItem(THEME_KEY);
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
+      if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+        document.documentElement.classList.add('dark');
+        themeIcon.classList.replace('fa-moon', 'fa-sun');
+      } else {
+        document.documentElement.classList.remove('dark');
+        themeIcon.classList.replace('fa-sun', 'fa-moon');
+      }
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.toggle('dark');
+      localStorage.setItem(THEME_KEY, isDark ? 'dark' : 'light');
+      if (isDark) {
+        themeIcon.classList.replace('fa-moon', 'fa-sun');
+        showToast('Dark theme activated');
+      } else {
+        themeIcon.classList.replace('fa-sun', 'fa-moon');
+        showToast('Light theme activated');
+      }
+    }
+
+    /* =========================================================
+       4. FORMATTING & HELPERS
+       ========================================================= */
+    function formatTodayDate() {
+      const options = { weekday: 'short', month: 'short', day: 'numeric' };
+      todayDateEl.textContent = new Date().toLocaleDateString(undefined, options);
+    }
+
+    function formatDueDate(isoString) {
+      if (!isoString) return '';
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return '';
+      
+      const now = new Date();
+      const isOverdue = d < now;
+      const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
+      return {
+        text: `${dateStr}, ${timeStr}`,
+        isOverdue: isOverdue
+      };
+    }
+
+    function showToast(message, iconClass = 'fa-check') {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      const toastIcon = document.getElementById('toast-icon');
+
+      toastMsg.textContent = message;
+      toastIcon.className = `fa-solid ${iconClass} text-brand-400 dark:text-brand-600`;
+      
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2300);
+    }
+
+    /* Priority badge color helper */
+    function getPriorityBadge(priority) {
+      switch (priority) {
+        case 'High':
+          return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 dark:bg-rose-950/70 dark:text-rose-400">High</span>';
+        case 'Medium':
+          return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-400">Med</span>';
+        case 'Low':
+        default:
+          return '<span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-400">Low</span>';
+      }
+    }
+
+    /* Category icon helper */
+    function getCategoryEmoji(cat) {
+      switch (cat) {
+        case 'Work': return '💼';
+        case 'Urgent': return '🔥';
+        case 'Shopping': return '🛒';
+        default: return '🌱';
+      }
+    }
+
+    /* =========================================================
+       5. RENDER LOGIC
+       ========================================================= */
+    function render() {
+      // 1. Calculate overall stats
+      const total = tasks.length;
+      const completedCount = tasks.filter(t => t.completed).length;
+      const percent = total === 0 ? 0 : Math.round((completedCount / total) * 100);
+
+      statsTextEl.textContent = `${completedCount} of ${total} done`;
+      statsBarEl.style.width = `${percent}%`;
+      statsPercentageEl.textContent = `${percent}%`;
+
+      // 2. Filter tasks
+      const filtered = tasks.filter(task => {
+        // Status filter
+        if (currentFilterStatus === 'active' && task.completed) return false;
+        if (currentFilterStatus === 'completed' && !task.completed) return false;
+
+        // Category filter
+        if (currentFilterCategory !== 'all' && task.category !== currentFilterCategory) return false;
+
+        // Search query
+        if (searchQuery.trim() !== '') {
+          const matchTitle = task.title.toLowerCase().includes(searchQuery.toLowerCase());
+          const matchCat = task.category.toLowerCase().includes(searchQuery.toLowerCase());
+          if (!matchTitle && !matchCat) return false;
+        }
+
+        return true;
+      });
+
+      // 3. Render List or Empty State
+      taskListEl.innerHTML = '';
+
+      if (filtered.length === 0) {
+        emptyStateEl.classList.remove('hidden');
+      } else {
+        emptyStateEl.classList.add('hidden');
+
+        // Sort: Incomplete first, then by priority / creation
+        filtered.sort((a, b) => {
+          if (a.completed !== b.completed) return a.completed ? 1 : -1;
+          return b.createdAt - a.createdAt;
+        });
+
+        filtered.forEach(task => {
+          const card = document.createElement('div');
+          card.className = `task-item bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-3.5 shadow-sm hover:shadow-md flex items-start gap-3 relative ${task.completed ? 'opacity-70 bg-slate-50/50 dark:bg-slate-900/50' : ''}`;
+          card.setAttribute('data-id', task.id);
+
+          const formattedDue = formatDueDate(task.dueDate);
+          const dueHtml = formattedDue ? `
+            <span class="flex items-center gap-1 text-[11px] font-medium ${formattedDue.isOverdue && !task.completed ? 'text-rose-500 font-bold' : 'text-slate-400 dark:text-slate-500'}">
+              <i class="fa-regular fa-clock"></i>
+              ${formattedDue.text}
+            </span>
+          ` : '';
+
+          card.innerHTML = `
+            <!-- Checkbox Action -->
+            <button class="toggle-btn mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+              task.completed 
+                ? 'bg-brand-600 border-brand-600 text-white' 
+                : 'border-slate-300 dark:border-slate-600 hover:border-brand-500 text-transparent'
+            }">
+              <i class="fa-solid fa-check text-xs"></i>
+            </button>
+
+            <!-- Task Info -->
+            <div class="flex-1 min-w-0 pr-1">
+              <p class="text-sm font-medium text-slate-800 dark:text-slate-100 break-words ${task.completed ? 'completed-title' : ''}">
+                ${escapeHTML(task.title)}
+              </p>
+              
+              <div class="flex flex-wrap items-center gap-2 mt-2">
+                <span class="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  ${getCategoryEmoji(task.category)} ${task.category}
+                </span>
+                ${getPriorityBadge(task.priority)}
+                ${dueHtml}
+              </div>
+            </div>
+
+            <!-- Actions (Edit & Delete) -->
+            <div class="flex items-center space-x-1">
+              <button class="edit-btn p-1.5 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 rounded-lg transition active:scale-90" title="Edit task">
+                <i class="fa-regular fa-pen-to-square text-sm"></i>
+              </button>
+              <button class="delete-btn p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition active:scale-90" title="Delete task">
+                <i class="fa-regular fa-trash-can text-sm"></i>
+              </button>
+            </div>
+          `;
+
+          // Event Listeners for row controls
+          card.querySelector('.toggle-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleTask(task.id);
+          });
+
+          card.querySelector('.edit-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            openEditModal(task.id);
+          });
+
+          card.querySelector('.delete-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteTask(task.id);
+          });
+
+          taskListEl.appendChild(card);
+        });
+      }
+    }
+
+    function escapeHTML(str) {
+      return str.replace(/[&<>'"]/g, 
+        tag => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          "'": '&#39;',
+          '"': '&quot;'
+        }[tag] || tag)
+      );
+    }
+
+    /* =========================================================
+       6. ACTIONS (ADD, EDIT, DELETE, TOGGLE)
+       ========================================================= */
+    function toggleTask(id) {
+      tasks = tasks.map(t => {
+        if (t.id === id) {
+          const updated = !t.completed;
+          showToast(updated ? 'Task marked complete! 🎉' : 'Task marked active', updated ? 'fa-check' : 'fa-rotate-left');
+          return { ...t, completed: updated };
+        }
+        return t;
+      });
+      saveTasks();
+    }
+
+    function deleteTask(id) {
+      tasks = tasks.filter(t => t.id !== id);
+      saveTasks();
+      showToast('Task removed', 'fa-trash');
+    }
+
+    function clearCompleted() {
+      const completedCount = tasks.filter(t => t.completed).length;
+      if (completedCount === 0) {
+        showToast('No completed tasks to clear', 'fa-info');
+        return;
+      }
+      tasks = tasks.filter(t => !t.completed);
+      saveTasks();
+      showToast(`Cleared ${completedCount} finished tasks`, 'fa-trash');
+    }
+
+    function openAddModal() {
+      taskIdInput.value = '';
+      taskForm.reset();
+      modalTitle.textContent = 'Add New Task';
+      taskCategorySelect.value = currentFilterCategory !== 'all' ? currentFilterCategory : 'Personal';
+      taskPrioritySelect.value = 'Medium';
+      taskModal.classList.remove('hidden');
+      setTimeout(() => taskTitleInput.focus(), 150);
+    }
+
+    function openEditModal(id) {
+      const task = tasks.find(t => t.id === id);
+      if (!task) return;
+
+      taskIdInput.value = task.id;
+      taskTitleInput.value = task.title;
+      taskCategorySelect.value = task.category;
+      taskPrioritySelect.value = task.priority;
+      taskDueInput.value = task.dueDate || '';
+      modalTitle.textContent = 'Edit Task';
+
+      taskModal.classList.remove('hidden');
+      setTimeout(() => taskTitleInput.focus(), 150);
+    }
+
+    function closeModal() {
+      taskModal.classList.add('hidden');
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const title = taskTitleInput.value.trim();
+      if (!title) return;
+
+      const editId = taskIdInput.value;
+
+      if (editId) {
+        // Editing existing
+        tasks = tasks.map(t => {
+          if (t.id === editId) {
+            return {
+              ...t,
+              title: title,
+              category: taskCategorySelect.value,
+              priority: taskPrioritySelect.value,
+              dueDate: taskDueInput.value
+            };
+          }
+          return t;
+        });
+        showToast('Task updated');
+      } else {
+        // Creating new
+        const newTask = {
+          id: 'task_' + Date.now(),
+          title: title,
+          category: taskCategorySelect.value,
+          priority: taskPrioritySelect.value,
+          dueDate: taskDueInput.value,
+          completed: false,
+          createdAt: Date.now()
+        };
+        tasks.unshift(newTask);
+        showToast('New task added!');
+      }
+
+      saveTasks();
+      closeModal();
+    }
+
+    /* =========================================================
+       7. EVENT LISTENERS
+       ========================================================= */
+    function setupEventListeners() {
+      // FAB & Modal triggers
+      openModalFab.addEventListener('click', openAddModal);
+      closeModalBtn.addEventListener('click', closeModal);
+      cancelModalBtn.addEventListener('click', closeModal);
+      taskForm.addEventListener('submit', handleFormSubmit);
+
+      // Close modal on outside backdrop click
+      taskModal.addEventListener('click', (e) => {
+        if (e.target === taskModal) closeModal();
+      });
+
+      // Clear completed tasks
+      clearCompletedBtn.addEventListener('click', clearCompleted);
+
+      // Theme toggle
+      themeToggleBtn.addEventListener('click', toggleTheme);
+
+      // Category filters
+      document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.category-btn').forEach(b => {
+            b.classList.remove('bg-brand-600', 'text-white', 'shadow-sm');
+            b.classList.add('bg-slate-100', 'dark:bg-slate-800', 'text-slate-600', 'dark:text-slate-300');
+          });
+          btn.classList.add('bg-brand-600', 'text-white', 'shadow-sm');
+          btn.classList.remove('bg-slate-100', 'dark:bg-slate-800', 'text-slate-600', 'dark:text-slate-300');
+          
+          currentFilterCategory = btn.getAttribute('data-cat');
+          render();
+        });
+      });
+
+      // Status filters (All / Active / Completed)
+      document.querySelectorAll('.status-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.status-tab').forEach(t => {
+            t.classList.remove('bg-white', 'dark:bg-slate-700', 'text-slate-900', 'dark:text-white', 'shadow-sm');
+          });
+          tab.classList.add('bg-white', 'dark:bg-slate-700', 'text-slate-900', 'dark:text-white', 'shadow-sm');
+
+          currentFilterStatus = tab.getAttribute('data-status');
+          render();
+        });
+      });
+
+      // Search bar
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        if (searchQuery.trim().length > 0) {
+          clearSearchBtn.classList.remove('hidden');
+        } else {
+          clearSearchBtn.classList.add('hidden');
+        }
+        render();
+      });
+
+      clearSearchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchQuery = '';
+        clearSearchBtn.classList.add('hidden');
+        render();
+        searchInput.focus();
+      });
+
+      // PWA BeforeInstallPrompt for Android Chrome
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        pwaInstallBtn.classList.remove('hidden');
+      });
+
+      pwaInstallBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          if (outcome === 'accepted') {
+            showToast('Installing to home screen...', 'fa-download');
+          }
+          deferredPrompt = null;
+          pwaInstallBtn.classList.add('hidden');
+        } else {
+          // Fallback instructional dialog for Android users
+          showToast('Tap Chrome menu (⋮) -> Add to Home screen', 'fa-info');
+        }
+      });
+    }
+
+    /* =========================================================
+       8. INITIALIZATION
+       ========================================================= */
+    window.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      formatTodayDate();
+      loadTasks();
+      setupEventListeners();
+      render();
+    });
+  </script>
+</body>
+</html>
